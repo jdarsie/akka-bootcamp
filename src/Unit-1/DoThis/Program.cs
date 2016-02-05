@@ -1,4 +1,3 @@
-﻿using System;
 ﻿using Akka.Actor;
 
 namespace WinTail
@@ -9,15 +8,21 @@ namespace WinTail
 
         public static void Main()
         {
-            var system = ActorSystem.Create("blah");
+            MyActorSystem = ActorSystem.Create("MyActorSystem");
 
-            var writerActor = system.ActorOf(Props.Create(() => new ConsoleWriterActor()));
-            var readerActor = system.ActorOf(Props.Create(() => new ConsoleReaderActor(writerActor)));
+            var consoleWriterProps = Props.Create<ConsoleWriterActor>();
+            var consoleWriterActor = MyActorSystem.ActorOf(consoleWriterProps, "consoleWriterActor");
 
-            readerActor.Tell(ConsoleReaderActor.StartCommand);
+            var validationActorProps = Props.Create(() => new ValidationActor(consoleWriterActor));
+            var validationActor = MyActorSystem.ActorOf(validationActorProps, "validationActor");
+
+            var consoleReaderProps = Props.Create<ConsoleReaderActor>(validationActor);
+            var consoleReaderActor = MyActorSystem.ActorOf(consoleReaderProps, "consoleReaderActor");
+
+            consoleReaderActor.Tell(ConsoleReaderActor.StartCommand);
 
             // blocks the main thread from exiting until the actor system is shut down
-            system.AwaitTermination();
+            MyActorSystem.AwaitTermination();
         }
     }
 }
