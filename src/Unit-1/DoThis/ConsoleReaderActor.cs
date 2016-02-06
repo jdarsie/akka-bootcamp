@@ -12,16 +12,16 @@ namespace WinTail
         public const string ExitCommand = "exit";
         public const string StartCommand = "start";
 
-        private readonly IActorRef _validationWriterActor;
+        private readonly IActorRef _validationActor;
 
-        public ConsoleReaderActor(IActorRef validationWriterActor)
+        public ConsoleReaderActor(IActorRef validationActor)
         {
-            if (validationWriterActor == null)
+            if (validationActor == null)
             {
-                throw new ArgumentNullException(nameof(validationWriterActor));
+                throw new ArgumentNullException(nameof(validationActor));
             }
 
-            _validationWriterActor = validationWriterActor;
+            _validationActor = validationActor;
         }
 
         protected override void OnReceive(object message)
@@ -36,9 +36,7 @@ namespace WinTail
 
         private static void DoPrintInstructions()
         {
-            Console.WriteLine("Write whatever you want into the console!");
-            Console.WriteLine("Some entries will pass validation, and some won't...\n\n");
-            Console.WriteLine("Type 'exit' to quit this application at any time.\n");
+            Console.WriteLine("Please provide the URI of a log file on disk.\n");
         }
 
         private void GetAndValidateInput()
@@ -51,7 +49,7 @@ namespace WinTail
                 return;
             }
 
-            _validationWriterActor.Tell(message);
+            _validationActor.Tell(message);
         }
     }
 }
