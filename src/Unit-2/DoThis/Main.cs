@@ -1,34 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
 using Akka.Actor;
-using Akka.Util.Internal;
 using ChartApp.Actors;
 
 namespace ChartApp
 {
     public partial class Main : Form
     {
+        private readonly Dictionary<CounterType, IActorRef> _toggleActors = new Dictionary<CounterType, IActorRef>();
         private IActorRef _chartActor;
-        private readonly AtomicCounter _seriesCounter = new AtomicCounter(1);
+        private IActorRef _coordinatorActor;
 
         public Main()
         {
             InitializeComponent();
         }
 
-        #region Initialization
-
-
-        private void Main_Load(object sender, EventArgs e)
+        private void BtnCpu_Click(object sender, EventArgs e)
         {
-            _chartActor = Program.ChartActors.ActorOf(Props.Create(() => new ChartingActor(sysChart)), "charting");
-            var series = ChartDataHelper.RandomSeries("FakeSeries" + _seriesCounter.GetAndIncrement());
-            _chartActor.Tell(new ChartingActor.InitializeChart(new Dictionary<string, Series>()
-            {
-                {series.Name, series}
-            }));
+            _toggleActors[CounterType.Cpu].Tell(new ButtonToggleActor.Toggle());
+        }
+
+        private void BtnDisk_Click(object sender, EventArgs e)
+        {
+            _toggleActors[CounterType.Disk].Tell(new ButtonToggleActor.Toggle());
+        }
+
+        private void BtnMemory_Click(object sender, EventArgs e)
+        {
+            _toggleActors[CounterType.Memory].Tell(new ButtonToggleActor.Toggle());
         }
 
         private void Main_FormClosing(object sender, FormClosingEventArgs e)
@@ -40,12 +41,25 @@ namespace ChartApp
             Program.ChartActors.Shutdown();
         }
 
-        #endregion
-
-        private void Button1_Click(object sender, EventArgs e)
+        private void Main_Load(object sender, EventArgs e)
         {
-            var series = ChartDataHelper.RandomSeries("FakeSeries" + _seriesCounter.GetAndIncrement());
-            _chartActor.Tell(new ChartingActor.AddSeries(series));
+            _chartActor = Program.ChartActors.ActorOf(Props.Create(() => new ChartingActor(sysChart)), "charting");
+            _chartActor.Tell(new ChartingActor.InitializeChart(null)); //no initial series
+
+            _coordinatorActor = Program.ChartActors.
+                ActorOf(Props.Create(() => new PerformanceCounterCoordinatorActor(_chartActor)), "counters");
+
+            // CPU button toggle actor
+            _toggleActors[CounterType.Cpu] = Program.ChartActors.
+                ActorOf(Props.Create(() => new ButtonToggleActor(_coordinatorActor, btnCpu, CounterType.Cpu, false)).WithDispatcher("akka.actor.synchronized-dispatcher"));
+
+            // MEMORY button toggle actor
+            _toggleActors[CounterType.Memory] = Program.ChartActors.
+                ActorOf(Props.Create(() => new ButtonToggleActor(_coordinatorActor, btnMemory, CounterType.Memory, false)).WithDispatcher("akka.actor.synchronized-dispatcher"));
+
+            // DISK button toggle actor
+            _toggleActors[CounterType.Disk] = Program.ChartActors.
+                ActorOf(Props.Create(() => new ButtonToggleActor(_coordinatorActor, btnDisk, CounterType.Disk, false)).WithDispatcher("akka.actor.synchronized-dispatcher"));
         }
     }
 }
