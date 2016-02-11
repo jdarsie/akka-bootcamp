@@ -43,7 +43,7 @@ namespace ChartApp
 
         private void Main_Load(object sender, EventArgs e)
         {
-            _chartActor = Program.ChartActors.ActorOf(Props.Create(() => new ChartingActor(sysChart)), "charting");
+            _chartActor = Program.ChartActors.ActorOf(Props.Create(() => new ChartingActor(sysChart, btnPauseResume)), "charting");
             _chartActor.Tell(new ChartingActor.InitializeChart(null)); //no initial series
 
             _coordinatorActor = Program.ChartActors.
@@ -60,6 +60,11 @@ namespace ChartApp
             // DISK button toggle actor
             _toggleActors[CounterType.Disk] = Program.ChartActors.
                 ActorOf(Props.Create(() => new ButtonToggleActor(_coordinatorActor, btnDisk, CounterType.Disk, false)).WithDispatcher("akka.actor.synchronized-dispatcher"));
+        }
+
+        private void BtnPauseResume_Click(object sender, EventArgs e)
+        {
+            _chartActor.Tell(new ChartingActor.TogglePause());
         }
     }
 }
