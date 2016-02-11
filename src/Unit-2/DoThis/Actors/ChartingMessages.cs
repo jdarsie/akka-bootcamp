@@ -2,8 +2,6 @@
 
 namespace ChartApp.Actors
 {
-    #region Reporting
-
     /// <summary>
     /// Signal used to indicate that it's time to sample all counters
     /// </summary>
@@ -24,10 +22,6 @@ namespace ChartApp.Actors
             Series = series;
         }
     }
-
-    #endregion
-
-    #region Performance Counter Management
 
     /// <summary>
     /// All types of counters supported by this example
@@ -70,6 +64,4 @@ namespace ChartApp.Actors
             Counter = counter;
         }
     }
-
-    #endregion
 }
