@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
+using Akka.Routing;
 using Octokit;
 
 namespace GithubActors.Actors
@@ -16,7 +17,7 @@ namespace GithubActors.Actors
 
         public class BeginJob
         {
-            public RepoKey Repo { get; private set; }
+            public RepoKey Repo { get; }
 
             public BeginJob(RepoKey repo)
             {
@@ -41,17 +42,14 @@ namespace GithubActors.Actors
         {
             private static readonly PublishUpdate _instance = new PublishUpdate();
 
-            public static PublishUpdate Instance
-            {
-                get { return _instance; }
-            }
+            public static PublishUpdate Instance => _instance;
 
-            private PublishUpdate() {}
+            private PublishUpdate() { }
         }
 
         public class SubscribeToProgressUpdates
         {
-            public IActorRef Subscriber { get; private set; }
+            public IActorRef Subscriber { get; }
 
             public SubscribeToProgressUpdates(IActorRef subscriber)
             {
@@ -67,7 +65,7 @@ namespace GithubActors.Actors
         private IActorRef _githubWorker;
         private ICancelable _publishTimer;
 
-        private bool _receivedInitialUsers = false;
+        private bool _receivedInitialUsers;
         private Dictionary<string, SimilarRepo> _similarRepos;
         private HashSet<IActorRef> _subscribers;
 
@@ -96,7 +94,7 @@ namespace GithubActors.Actors
 
         protected override void PreStart()
         {
-            _githubWorker = Context.ActorOf(Props.Create(() => new GithubWorkerActor(GithubClientFactory.GetClient)));
+            _githubWorker = Context.ActorOf(Props.Create(() => new GithubWorkerActor(GithubClientFactory.GetClient)).WithRouter(new RoundRobinPool(10)));
         }
 
         private void Waiting()
