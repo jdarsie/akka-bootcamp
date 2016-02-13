@@ -11,11 +11,10 @@ namespace GithubActors.Actors
     /// </summary>
     public class RepoResultsActor : ReceiveActor
     {
-        private DataGridView _userDg;
-        private ToolStripStatusLabel _statusLabel;
-        private ToolStripProgressBar _progressBar;
-
         private bool _hasSetProgress = false;
+        private ToolStripProgressBar _progressBar;
+        private ToolStripStatusLabel _statusLabel;
+        private DataGridView _userDg;
 
         public RepoResultsActor(DataGridView userDg, ToolStripStatusLabel statusLabel, ToolStripProgressBar progressBar)
         {

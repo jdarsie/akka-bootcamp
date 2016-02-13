@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Linq;
 using Akka.Actor;
-using Akka.Routing;
 
 namespace GithubActors.Actors
 {
@@ -10,42 +8,43 @@ namespace GithubActors.Actors
     /// </summary>
     public class GithubCommanderActor : ReceiveActor
     {
-        #region Message classes
-
-        public class CanAcceptJob
-        {
-            public CanAcceptJob(RepoKey repo)
-            {
-                Repo = repo;
-            }
-
-            public RepoKey Repo { get; private set; }
-        }
+        #region  -- Inner Types --
 
         public class AbleToAcceptJob
         {
+            public RepoKey Repo { get; private set; }
+
             public AbleToAcceptJob(RepoKey repo)
             {
                 Repo = repo;
             }
+        }
 
+        public class CanAcceptJob
+        {
             public RepoKey Repo { get; private set; }
+
+            public CanAcceptJob(RepoKey repo)
+            {
+                Repo = repo;
+            }
         }
 
         public class UnableToAcceptJob
         {
+            public RepoKey Repo { get; private set; }
+
             public UnableToAcceptJob(RepoKey repo)
             {
                 Repo = repo;
             }
-
-            public RepoKey Repo { get; private set; }
         }
 
         #endregion
 
-        private IActorRef _coordinator;
         private IActorRef _canAcceptJobSender;
+
+        private IActorRef _coordinator;
 
         public GithubCommanderActor()
         {
@@ -55,10 +54,7 @@ namespace GithubActors.Actors
                 _coordinator.Tell(job);
             });
 
-            Receive<UnableToAcceptJob>(job =>
-            {
-                _canAcceptJobSender.Tell(job);
-            });
+            Receive<UnableToAcceptJob>(job => { _canAcceptJobSender.Tell(job); });
 
             Receive<AbleToAcceptJob>(job =>
             {
@@ -72,17 +68,17 @@ namespace GithubActors.Actors
             });
         }
 
-        protected override void PreStart()
-        {
-            _coordinator = Context.ActorOf(Props.Create(() => new GithubCoordinatorActor()), ActorPaths.GithubCoordinatorActor.Name);
-            base.PreStart();
-        }
-
         protected override void PreRestart(Exception reason, object message)
         {
             //kill off the old coordinator so we can recreate it from scratch
             _coordinator.Tell(PoisonPill.Instance);
             base.PreRestart(reason, message);
+        }
+
+        protected override void PreStart()
+        {
+            _coordinator = Context.ActorOf(Props.Create(() => new GithubCoordinatorActor()), ActorPaths.GithubCoordinatorActor.Name);
+            base.PreStart();
         }
     }
 }

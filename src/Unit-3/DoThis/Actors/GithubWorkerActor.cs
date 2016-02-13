@@ -11,58 +11,54 @@ namespace GithubActors.Actors
     /// </summary>
     public class GithubWorkerActor : ReceiveActor
     {
-        #region Message classes
-
-        public class QueryStarrers
-        {
-            public QueryStarrers(RepoKey key)
-            {
-                Key = key;
-            }
-
-            public RepoKey Key { get; private set; }
-        }
+        #region  -- Inner Types --
 
         /// <summary>
         /// Query an individual starrer
         /// </summary>
         public class QueryStarrer
         {
+            public string Login { get; private set; }
+
             public QueryStarrer(string login)
             {
                 Login = login;
             }
+        }
 
-            public string Login { get; private set; }
+        public class QueryStarrers
+        {
+            public RepoKey Key { get; private set; }
+
+            public QueryStarrers(RepoKey key)
+            {
+                Key = key;
+            }
         }
 
         public class StarredReposForUser
         {
+            public string Login { get; private set; }
+
+            public IEnumerable<Repository> Repos { get; private set; }
+
             public StarredReposForUser(string login, IEnumerable<Repository> repos)
             {
                 Repos = repos;
                 Login = login;
             }
-
-            public string Login { get; private set; }
-
-            public IEnumerable<Repository> Repos { get; private set; }
         }
 
         #endregion
 
-        private IGitHubClient _gitHubClient;
         private readonly Func<IGitHubClient> _gitHubClientFactory;
+
+        private IGitHubClient _gitHubClient;
 
         public GithubWorkerActor(Func<IGitHubClient> gitHubClientFactory)
         {
             _gitHubClientFactory = gitHubClientFactory;
             InitialReceives();
-        }
-
-        protected override void PreStart()
-        {
-            _gitHubClient = _gitHubClientFactory();
         }
 
         private void InitialReceives()
@@ -108,6 +104,11 @@ namespace GithubActors.Actors
                     Sender.Tell(query.NextTry());
                 }
             });
+        }
+
+        protected override void PreStart()
+        {
+            _gitHubClient = _gitHubClientFactory();
         }
     }
 }

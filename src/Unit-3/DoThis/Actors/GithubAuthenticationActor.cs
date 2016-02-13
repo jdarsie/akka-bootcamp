@@ -7,28 +7,29 @@ namespace GithubActors.Actors
 {
     public class GithubAuthenticationActor : ReceiveActor
     {
-        #region Messages
+        #region  -- Inner Types --
 
         public class Authenticate
         {
+            public string OAuthToken { get; private set; }
+
             public Authenticate(string oAuthToken)
             {
                 OAuthToken = oAuthToken;
             }
-
-            public string OAuthToken { get; private set; }
         }
 
-        public class AuthenticationFailed { }
+        public class AuthenticationCancelled {}
 
-        public class AuthenticationCancelled { }
+        public class AuthenticationFailed {}
 
-        public class AuthenticationSuccess { }
+        public class AuthenticationSuccess {}
 
         #endregion
 
-        private readonly Label _statusLabel;
         private readonly GithubAuth _form;
+
+        private readonly Label _statusLabel;
 
         public GithubAuthenticationActor(Label statusLabel, GithubAuth form)
         {
@@ -37,23 +38,15 @@ namespace GithubActors.Actors
             Unauthenticated();
         }
 
-        private void Unauthenticated()
+        private void Authenticating()
         {
-            Receive<Authenticate>(auth =>
+            Receive<AuthenticationFailed>(failed => BecomeUnauthenticated("Authentication failed."));
+            Receive<AuthenticationCancelled>(cancelled => BecomeUnauthenticated("Authentication timed out."));
+            Receive<AuthenticationSuccess>(success =>
             {
-                //need a client to test our credentials with
-                var client = GithubClientFactory.GetUnauthenticatedClient();
-                GithubClientFactory.OAuthToken = auth.OAuthToken;
-                client.Credentials = new Credentials(auth.OAuthToken);
-                BecomeAuthenticating();
-                client.User.Current().ContinueWith<object>(tr =>
-                {
-                    if (tr.IsFaulted)
-                        return new AuthenticationFailed();
-                    if (tr.IsCanceled)
-                        return new AuthenticationCancelled();
-                    return new AuthenticationSuccess();
-                }).PipeTo(Self);
+                var launcherForm = new LauncherForm();
+                launcherForm.Show();
+                _form.Hide();
             });
         }
 
@@ -72,15 +65,27 @@ namespace GithubActors.Actors
             Become(Unauthenticated);
         }
 
-        private void Authenticating()
+        private void Unauthenticated()
         {
-            Receive<AuthenticationFailed>(failed => BecomeUnauthenticated("Authentication failed."));
-            Receive<AuthenticationCancelled>(cancelled => BecomeUnauthenticated("Authentication timed out."));
-            Receive<AuthenticationSuccess>(success =>
+            Receive<Authenticate>(auth =>
             {
-                var launcherForm = new LauncherForm();
-                launcherForm.Show();
-                _form.Hide();
+                //need a client to test our credentials with
+                var client = GithubClientFactory.GetUnauthenticatedClient();
+                GithubClientFactory.OAuthToken = auth.OAuthToken;
+                client.Credentials = new Credentials(auth.OAuthToken);
+                BecomeAuthenticating();
+                client.User.Current().ContinueWith<object>(tr =>
+                {
+                    if (tr.IsFaulted)
+                    {
+                        return new AuthenticationFailed();
+                    }
+                    if (tr.IsCanceled)
+                    {
+                        return new AuthenticationCancelled();
+                    }
+                    return new AuthenticationSuccess();
+                }).PipeTo(Self);
             });
         }
     }

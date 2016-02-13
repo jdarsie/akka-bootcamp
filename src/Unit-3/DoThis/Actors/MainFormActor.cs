@@ -10,29 +10,65 @@ namespace GithubActors.Actors
     /// </summary>
     public class MainFormActor : ReceiveActor, IWithUnboundedStash
     {
-        #region Messages
+        #region  -- Inner Types --
 
         public class LaunchRepoResultsWindow
         {
+            public IActorRef Coordinator { get; private set; }
+
+            public RepoKey Repo { get; private set; }
+
             public LaunchRepoResultsWindow(RepoKey repo, IActorRef coordinator)
             {
                 Repo = repo;
                 Coordinator = coordinator;
             }
-
-            public RepoKey Repo { get; private set; }
-
-            public IActorRef Coordinator { get; private set; }
         }
 
         #endregion
 
         private readonly Label _validationLabel;
 
+        public IStash Stash { get; set; }
+
         public MainFormActor(Label validationLabel)
         {
             _validationLabel = validationLabel;
             Ready();
+        }
+
+        /// <summary>
+        /// Make any necessary URI updates, then switch our state to busy
+        /// </summary>
+        private void BecomeBusy(string repoUrl)
+        {
+            _validationLabel.Visible = true;
+            _validationLabel.Text = string.Format("Validating {0}...", repoUrl);
+            _validationLabel.ForeColor = Color.Gold;
+            Become(Busy);
+        }
+
+        private void BecomeReady(string message, bool isValid = true)
+        {
+            _validationLabel.Text = message;
+            _validationLabel.ForeColor = isValid ? Color.Green : Color.Red;
+            Stash.UnstashAll();
+            Become(Ready);
+        }
+
+        /// <summary>
+        /// State for when we're currently processing a job
+        /// </summary>
+        private void Busy()
+        {
+            Receive<GithubValidatorActor.RepoIsValid>(valid => BecomeReady("Valid!"));
+            Receive<GithubValidatorActor.InvalidRepo>(invalid => BecomeReady(invalid.Reason, false));
+            //yes
+            Receive<GithubCommanderActor.UnableToAcceptJob>(job => BecomeReady(string.Format("{0}/{1} is a valid repo, but system can't accept additional jobs", job.Repo.Owner, job.Repo.Repo), false));
+
+            //no
+            Receive<GithubCommanderActor.AbleToAcceptJob>(job => BecomeReady(string.Format("{0}/{1} is a valid repo - starting job!", job.Repo.Owner, job.Repo.Repo)));
+            Receive<LaunchRepoResultsWindow>(window => Stash.Stash());
         }
 
         /// <summary>
@@ -53,41 +89,5 @@ namespace GithubActors.Actors
                 form.Show();
             });
         }
-
-        /// <summary>
-        /// Make any necessary URI updates, then switch our state to busy
-        /// </summary>
-        private void BecomeBusy(string repoUrl)
-        {
-            _validationLabel.Visible = true;
-            _validationLabel.Text = string.Format("Validating {0}...", repoUrl);
-            _validationLabel.ForeColor = Color.Gold;
-            Become(Busy);
-        }
-
-        /// <summary>
-        /// State for when we're currently processing a job
-        /// </summary>
-        private void Busy()
-        {
-            Receive<GithubValidatorActor.RepoIsValid>(valid => BecomeReady("Valid!"));
-            Receive<GithubValidatorActor.InvalidRepo>(invalid => BecomeReady(invalid.Reason, false));
-            //yes
-            Receive<GithubCommanderActor.UnableToAcceptJob>(job => BecomeReady(string.Format("{0}/{1} is a valid repo, but system can't accept additional jobs", job.Repo.Owner, job.Repo.Repo), false));
-
-            //no
-            Receive<GithubCommanderActor.AbleToAcceptJob>(job => BecomeReady(string.Format("{0}/{1} is a valid repo - starting job!", job.Repo.Owner, job.Repo.Repo)));
-            Receive<LaunchRepoResultsWindow>(window => Stash.Stash());
-        }
-
-        private void BecomeReady(string message, bool isValid = true)
-        {
-            _validationLabel.Text = message;
-            _validationLabel.ForeColor = isValid ? Color.Green : Color.Red;
-            Stash.UnstashAll();
-            Become(Ready);
-        }
-
-        public IStash Stash { get; set; }
     }
 }

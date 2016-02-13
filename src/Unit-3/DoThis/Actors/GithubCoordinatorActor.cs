@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Akka.Actor;
-using Akka.Routing;
 using Octokit;
 
 namespace GithubActors.Actors
@@ -14,36 +12,15 @@ namespace GithubActors.Actors
     /// </summary>
     public class GithubCoordinatorActor : ReceiveActor
     {
-        #region Message classes
+        #region  -- Inner Types --
 
         public class BeginJob
         {
+            public RepoKey Repo { get; private set; }
+
             public BeginJob(RepoKey repo)
             {
                 Repo = repo;
-            }
-
-            public RepoKey Repo { get; private set; }
-        }
-
-        public class SubscribeToProgressUpdates
-        {
-            public SubscribeToProgressUpdates(IActorRef subscriber)
-            {
-                Subscriber = subscriber;
-            }
-
-            public IActorRef Subscriber { get; private set; }
-        }
-
-        public class PublishUpdate
-        {
-            private PublishUpdate() { }
-            private static readonly PublishUpdate _instance = new PublishUpdate();
-
-            public static PublishUpdate Instance
-            {
-                get { return _instance; }
             }
         }
 
@@ -52,29 +29,69 @@ namespace GithubActors.Actors
         /// </summary>
         public class JobFailed
         {
+            public RepoKey Repo { get; private set; }
+
             public JobFailed(RepoKey repo)
             {
                 Repo = repo;
             }
+        }
 
-            public RepoKey Repo { get; private set; }
+        public class PublishUpdate
+        {
+            private static readonly PublishUpdate _instance = new PublishUpdate();
+
+            public static PublishUpdate Instance
+            {
+                get { return _instance; }
+            }
+
+            private PublishUpdate() {}
+        }
+
+        public class SubscribeToProgressUpdates
+        {
+            public IActorRef Subscriber { get; private set; }
+
+            public SubscribeToProgressUpdates(IActorRef subscriber)
+            {
+                Subscriber = subscriber;
+            }
         }
 
         #endregion
 
-        private IActorRef _githubWorker;
-
         private RepoKey _currentRepo;
-        private Dictionary<string, SimilarRepo> _similarRepos;
-        private HashSet<IActorRef> _subscribers;
-        private ICancelable _publishTimer;
         private GithubProgressStats _githubProgressStats;
 
+        private IActorRef _githubWorker;
+        private ICancelable _publishTimer;
+
         private bool _receivedInitialUsers = false;
+        private Dictionary<string, SimilarRepo> _similarRepos;
+        private HashSet<IActorRef> _subscribers;
 
         public GithubCoordinatorActor()
         {
             Waiting();
+        }
+
+        private void BecomeWaiting()
+        {
+            //stop publishing
+            _publishTimer.Cancel();
+            Become(Waiting);
+        }
+
+        private void BecomeWorking(RepoKey repo)
+        {
+            _receivedInitialUsers = false;
+            _currentRepo = repo;
+            _subscribers = new HashSet<IActorRef>();
+            _similarRepos = new Dictionary<string, SimilarRepo>();
+            _publishTimer = new Cancelable(Context.System.Scheduler);
+            _githubProgressStats = new GithubProgressStats();
+            Become(Working);
         }
 
         protected override void PreStart()
@@ -92,24 +109,6 @@ namespace GithubActors.Actors
                 //kick off the job to query the repo's list of starrers
                 _githubWorker.Tell(new RetryableQuery(new GithubWorkerActor.QueryStarrers(job.Repo), 4));
             });
-        }
-
-        private void BecomeWorking(RepoKey repo)
-        {
-            _receivedInitialUsers = false;
-            _currentRepo = repo;
-            _subscribers = new HashSet<IActorRef>();
-            _similarRepos = new Dictionary<string, SimilarRepo>();
-            _publishTimer = new Cancelable(Context.System.Scheduler);
-            _githubProgressStats = new GithubProgressStats();
-            Become(Working);
-        }
-
-        private void BecomeWaiting()
-        {
-            //stop publishing
-            _publishTimer.Cancel();
-            Become(Waiting);
         }
 
         private void Working()
@@ -161,7 +160,9 @@ namespace GithubActors.Actors
 
                 //queue up all of the jobs
                 foreach (var user in users)
+                {
                     _githubWorker.Tell(new RetryableQuery(new GithubWorkerActor.QueryStarrer(user.Login), 3));
+                }
             });
 
             Receive<GithubCommanderActor.CanAcceptJob>(job => Sender.Tell(new GithubCommanderActor.UnableToAcceptJob(job.Repo)));

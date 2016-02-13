@@ -17,6 +17,12 @@ namespace GithubActors
             InitializeComponent();
         }
 
+        private void RepoResultsForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            //kill the form actor
+            _formActor.Tell(PoisonPill.Instance);
+        }
+
         private void RepoResultsForm_Load(object sender, System.EventArgs e)
         {
             _formActor =
@@ -28,12 +34,6 @@ namespace GithubActors
 
             //start subscribing to updates
             _githubCoordinator.Tell(new GithubCoordinatorActor.SubscribeToProgressUpdates(_formActor));
-        }
-
-        private void RepoResultsForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            //kill the form actor
-            _formActor.Tell(PoisonPill.Instance);
         }
     }
 }

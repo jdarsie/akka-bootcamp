@@ -8,18 +8,23 @@ namespace GithubActors
     /// </summary>
     public class SimilarRepo : IComparable<SimilarRepo>
     {
+        public Repository Repo { get; private set; }
+
+        public int SharedStarrers { get; set; }
+
         public SimilarRepo(Repository repo)
         {
             Repo = repo;
         }
 
-        public Repository Repo { get; private set; }
+        #region
 
-        public int SharedStarrers { get; set; }
         public int CompareTo(SimilarRepo other)
         {
             return SharedStarrers.CompareTo(other.SharedStarrers);
         }
+
+        #endregion
     }
 
     /// <summary>
@@ -29,24 +34,22 @@ namespace GithubActors
     /// </summary>
     public class GithubProgressStats
     {
-        public int ExpectedUsers { get; private set; }
-        public int UsersThusFar { get; private set; }
-        public int QueryFailures { get; private set; }
-        public DateTime StartTime { get; private set; }
-        public DateTime? EndTime { get; private set; }
-
         public TimeSpan Elapsed
         {
-            get
-            {
-                return ((EndTime.HasValue ? EndTime.Value : DateTime.UtcNow) -StartTime);
-            }
+            get { return (EndTime.HasValue ? EndTime.Value : DateTime.UtcNow) - StartTime; }
         }
+
+        public DateTime? EndTime { get; private set; }
+        public int ExpectedUsers { get; private set; }
 
         public bool IsFinished
         {
             get { return ExpectedUsers == UsersThusFar + QueryFailures; }
         }
+
+        public int QueryFailures { get; private set; }
+        public DateTime StartTime { get; private set; }
+        public int UsersThusFar { get; private set; }
 
         public GithubProgressStats()
         {
@@ -63,27 +66,13 @@ namespace GithubActors
         }
 
         /// <summary>
-        /// Add <see cref="delta"/> users to the running total of <see cref="UsersThusFar"/>
+        /// Creates a deep copy of the <see cref="GithubProgressStats"/> class
         /// </summary>
-        public GithubProgressStats UserQueriesFinished(int delta = 1)
+        public GithubProgressStats Copy(int? expectedUsers = null, int? usersThusFar = null, int? queryFailures = null,
+            DateTime? startTime = null, DateTime? endTime = null)
         {
-            return Copy(usersThusFar: UsersThusFar + delta);
-        }
-
-        /// <summary>
-        /// Set the <see cref="ExpectedUsers"/> total
-        /// </summary>
-        public GithubProgressStats SetExpectedUserCount(int totalExpectedUsers)
-        {
-            return Copy(expectedUsers: totalExpectedUsers);
-        }
-
-        /// <summary>
-        /// Add <see cref="delta"/> to the running <see cref="QueryFailures"/> total
-        /// </summary>
-        public GithubProgressStats IncrementFailures(int delta = 1)
-        {
-            return Copy(queryFailures: QueryFailures + delta);
+            return new GithubProgressStats(startTime ?? StartTime, expectedUsers ?? ExpectedUsers, usersThusFar ?? UsersThusFar,
+                queryFailures ?? QueryFailures, endTime ?? EndTime);
         }
 
         /// <summary>
@@ -95,13 +84,27 @@ namespace GithubActors
         }
 
         /// <summary>
-        /// Creates a deep copy of the <see cref="GithubProgressStats"/> class
+        /// Add <see cref="delta"/> to the running <see cref="QueryFailures"/> total
         /// </summary>
-        public GithubProgressStats Copy(int? expectedUsers = null, int? usersThusFar = null, int? queryFailures = null,
-            DateTime? startTime = null, DateTime? endTime = null)
+        public GithubProgressStats IncrementFailures(int delta = 1)
         {
-            return new GithubProgressStats(startTime ?? StartTime, expectedUsers ?? ExpectedUsers, usersThusFar ?? UsersThusFar,
-                queryFailures ?? QueryFailures, endTime ?? EndTime);
+            return Copy(queryFailures: QueryFailures + delta);
+        }
+
+        /// <summary>
+        /// Set the <see cref="ExpectedUsers"/> total
+        /// </summary>
+        public GithubProgressStats SetExpectedUserCount(int totalExpectedUsers)
+        {
+            return Copy(expectedUsers: totalExpectedUsers);
+        }
+
+        /// <summary>
+        /// Add <see cref="delta"/> users to the running total of <see cref="UsersThusFar"/>
+        /// </summary>
+        public GithubProgressStats UserQueriesFinished(int delta = 1)
+        {
+            return Copy(usersThusFar: UsersThusFar + delta);
         }
     }
 }
